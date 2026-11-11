@@ -1,0 +1,22 @@
+rules_version = '2';
+// Who can see and edit the dashboard is controlled by one document: config/access
+//   editors:    list of Google emails that can add, edit and delete projects
+//   viewers:    list of Google emails that can only view
+//   publicRead: true lets anyone with the link view (no sign-in needed)
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function access() { return get(/databases/$(database)/documents/config/access).data; }
+    function email() { return request.auth != null ? request.auth.token.email.lower() : ''; }
+    function isEditor() { return request.auth != null && request.auth.token.email_verified && email() in access().editors; }
+    function isViewer() { return access().get('publicRead', false) == true || (request.auth != null && (email() in access().get('viewers', []) || isEditor())); }
+
+    match /config/access {
+      allow read: if request.auth != null;
+      allow write: if false; // change it in the Firebase console
+    }
+    match /projects/{id} {
+      allow read: if isViewer();
+      allow write: if isEditor();
+    }
+  }
+}
