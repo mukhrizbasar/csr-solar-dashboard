@@ -13,5 +13,5 @@ export const CONFIG = {
   },
 
   // Optional: shown in the header.
-  title: "CSR Solar Projects 2026"
+  title: "CSR Solar Projects"
 };

@@ -46,3 +46,10 @@ Open the site, click **Sign in with Google** with an editor email. The list will
 - Add or remove editors and viewers by editing `config/access` in the Firestore console.
 - Click any pin or row to see details. Editors click **Edit project** to change status, value, dates, capacity or location. **Pick on map** with satellite view is the quickest way to pin the exact rooftop.
 - **Export to Excel** downloads the current list in the Masterlist column layout plus coordinates.
+
+## Adding other years (2025, 2027 to 2030)
+- Use the **year selector** next to the filters to view one year or all years together. Each project has a **Year** field.
+- To bring in a whole year's list, an editor clicks **Import list** and chooses that year's Excel file. Use the same columns as the Masterlist sheet (No., Component, Project Name, State, Month, Application Received Date, Project Value (RM), Project Status, ...). The app reads the sheet named "Masterlist" (or the first sheet).
+- The year comes from a "Year" column if the file has one, otherwise from the Application Received Date, otherwise the year currently selected.
+- Projects already in the dashboard (same name and year) are skipped, so importing the same file twice is safe.
+- Imported projects have no map pin yet. Open each one, click **Edit project**, then **Pick on map**.

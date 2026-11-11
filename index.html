@@ -182,12 +182,14 @@ form.edit textarea{min-height:64px;resize:vertical}
     <div>
       <div class="eyebrow"><span class="sun"></span>CSR Environment Pillar</div>
       <h1 id="appTitle">CSR Solar Projects 2026</h1>
-      <div class="sub">Solar rooftop and streetlight projects across Malaysia, from the masterlist. <span id="syncNote" class="status-line">Connecting…</span></div>
+      <div class="sub">Solar rooftop and streetlight projects across Malaysia. <span id="syncNote" class="status-line">Connecting…</span></div>
     </div>
     <div class="actions">
       <span class="status-line" id="who"></span>
       <button class="btn" id="signInBtn" type="button">Sign in with Google</button>
       <button class="btn" id="signOutBtn" type="button" hidden>Sign out</button>
+      <button class="btn" id="importBtn" type="button" hidden>Import list</button>
+      <input type="file" id="importAny" accept=".xlsx,.xls,.json" hidden>
       <button class="btn" id="exportBtn" type="button">Export to Excel</button>
       <button class="btn primary" id="addBtn" type="button" hidden>+ Add project</button>
     </div>
@@ -195,6 +197,7 @@ form.edit textarea{min-height:64px;resize:vertical}
 
   <div class="filters">
     <div class="chips" id="typeChips" role="group" aria-label="Project type"></div>
+    <select id="fYear" aria-label="Year"></select>
     <select id="fState" aria-label="State"><option value="">All states</option></select>
     <select id="fComp" aria-label="Component"><option value="">All components</option></select>
     <input id="fSearch" type="search" placeholder="Search project name or remarks" aria-label="Search">
