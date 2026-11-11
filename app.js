@@ -8,11 +8,13 @@ const TYPES = ["Solar Rooftop","Solar Streetlight","Rooftop + Streetlight","Othe
 const TCLS = {"Solar Rooftop":"t-rooftop","Solar Streetlight":"t-street","Rooftop + Streetlight":"t-both","Other":"t-other"};
 const STATES = ["Johor","Kedah","Kelantan","Malacca","Negeri Sembilan","Pahang","Perak","Perlis","Penang","Sabah","Sarawak","Selangor","Terengganu","W.P. Kuala Lumpur","W.P. Labuan","W.P. Putrajaya","Nationwide"];
 const COMPONENTS = ["Komuniti Lestari","Tree for a Tree","Pulau Tenaga Hijau","Biodiversity","Firefly Conservation","Extinction Species"];
+const YEARS = [2025,2026,2027,2028,2029,2030];
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const PEN=[[1.2,99.6],[6.8,104.6]], ALL=[[0.8,99.6],[7.4,119.3]];
 
-const S = { projects:new Map(), type:"solar", status:"", state:"", comp:"", q:"", sel:null, editing:null, confirmDel:false, pick:false, canWrite:false, user:null, loaded:false };
-try{ const t=localStorage.getItem("csr-type"); if(t) S.type=t; }catch(e){}
+const S = { projects:new Map(), year:String(Math.min(2030,Math.max(2025,new Date().getFullYear()))), type:"solar", status:"", state:"", comp:"", q:"", sel:null, editing:null, confirmDel:false, pick:false, canWrite:false, user:null, loaded:false };
+try{ const t=localStorage.getItem("csr-type"); if(t) S.type=t; const y=localStorage.getItem("csr-year"); if(y!==null) S.year=y; }catch(e){}
+const projYear = p => p.year ? +p.year : (p.appDate ? +String(p.appDate).slice(0,4) : null);
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -30,6 +32,7 @@ function filtered(ignoreStatus){
   const q=S.q.trim().toLowerCase();
   return [...S.projects.values()].filter(p=>{
     if(!typeMatch(p)) return false;
+    if(S.year && projYear(p)!==+S.year) return false;
     if(S.state && p.state!==S.state) return false;
     if(S.comp && p.component!==S.comp) return false;
     if(!ignoreStatus && S.status && p.status!==S.status) return false;
@@ -150,9 +153,9 @@ function renderList(rows){
   $("listCount").textContent=`${rows.length} shown`;
   if(!S.loaded) return;
   if(!rows.length){
-    $("list").innerHTML = S.projects.size ? `<div class="empty">No projects match these filters.</div>`
-      : `<div class="empty">No projects yet.${S.canWrite?`<br><br><label class="btn primary" for="importFile">Import projects file (.json)</label><input type="file" id="importFile" accept=".json,application/json" hidden>`:" An editor needs to add the first project."}</div>`;
-    if($("importFile")) $("importFile").onchange=e=>e.target.files[0]&&importSeed(e.target.files[0]);
+    $("list").innerHTML = S.projects.size ? `<div class="empty">${S.year?`No ${S.year} projects match these filters.`:"No projects match these filters."}</div>`
+      : `<div class="empty">No projects yet.${S.canWrite?`<br><br><button class="btn primary" type="button" id="importFile">Import a project list</button>`:" An editor needs to add the first project."}</div>`;
+    if($("importFile")) $("importFile").onclick=()=>$("importAny").click();
     return;
   }
   $("list").innerHTML=rows.map(p=>`<button type="button" class="item ${S.sel===p._id?"sel":""}" data-id="${p._id}">
@@ -217,6 +220,7 @@ function renderEdit(p){
     <label>Status<select id="e-status" name="status">${opt(STATUSES,p.status||"Site Visit")}</select></label>
     <label>State<select id="e-state" name="state">${opt(STATES,p.state,"—")}</select></label>
     <label>Project value (RM)<input id="e-value" name="value" type="number" step="0.01" min="0" inputmode="decimal" value="${p.value??""}"></label>
+    <label>Year<select id="e-year" name="year">${opt(YEARS.map(String),String(projYear(p)||S.year||new Date().getFullYear()))}</select></label>
     <label>Month<select id="e-month" name="month">${opt(MONTHS,p.month,"—")}</select></label>
     <label>Capacity (kWp)<input id="e-kwp" name="kwp" type="number" step="0.01" min="0" value="${p.kwp??""}"></label>
     <label>Streetlight units<input id="e-units" name="units" type="number" step="1" min="0" value="${p.units??""}"></label>
@@ -255,7 +259,7 @@ function renderEdit(p){
     if(!g("name")){ f.elements.name.focus(); toast("Add a project name"); return; }
     const lat=num("lat"), lng=num("lng");
     if((lat==null)!==(lng==null) || (lat!=null && (Math.abs(lat)>90||Math.abs(lng)>180))){ toast("Enter both latitude and longitude, or leave both empty"); return; }
-    const data={ no:S.editing.no ?? nextNo(), name:g("name"), type:g("type"), component:g("component")||null, status:g("status"), state:g("state")||null, value:num("value"), month:g("month")||null, kwp:num("kwp"), units:num("units"), appDate:g("appDate")||null, completionDate:g("completionDate")||null, invoice:g("invoice"), payment:g("payment"), nposNo:g("nposNo"), nposDate:g("nposDate")||null, remarks:g("remarks"), lat, lng, locVerified: lat!=null && f.elements.locVerified.checked, updatedAt:new Date().toISOString(), updatedBy:S.user?.email||"" };
+    const data={ no:S.editing.no ?? nextNo(), year:+g("year"), name:g("name"), type:g("type"), component:g("component")||null, status:g("status"), state:g("state")||null, value:num("value"), month:g("month")||null, kwp:num("kwp"), units:num("units"), appDate:g("appDate")||null, completionDate:g("completionDate")||null, invoice:g("invoice"), payment:g("payment"), nposNo:g("nposNo"), nposDate:g("nposDate")||null, remarks:g("remarks"), lat, lng, locVerified: lat!=null && f.elements.locVerified.checked, updatedAt:new Date().toISOString(), updatedBy:S.user?.email||"" };
     $("saveBtn").disabled=true;
     try{
       const ref = S.editing._id ? doc(db,"projects",S.editing._id) : doc(collection(db,"projects"));
@@ -293,11 +297,15 @@ function render(){
   const all=filtered(true), rows=filtered(false);
   renderKpis(all); renderPipe(all); renderMap(rows); renderStateBars(all); renderPayBars(all);
   if(!S.editing || !$("editForm")){ renderList(rows); renderSide(); }
-  $("addBtn").hidden=!S.canWrite;
+  $("addBtn").hidden=!S.canWrite; $("importBtn").hidden=!S.canWrite; renderTitle();
 }
 
 /* events */
 $("typeChips").addEventListener("click",e=>{const b=e.target.closest("button"); if(!b) return; S.type=b.dataset.v; try{localStorage.setItem("csr-type",S.type)}catch(e){} render();});
+$("fYear").innerHTML=`<option value="">All years (2025–2030)</option>`+YEARS.map(y=>`<option ${String(y)===S.year?"selected":""}>${y}</option>`).join("");
+$("fYear").onchange=e=>{S.year=e.target.value; try{localStorage.setItem("csr-year",S.year)}catch(e){} S.sel=null; render();};
+$("importBtn").onclick=()=>$("importAny").click();
+$("importAny").onchange=e=>{ const f=e.target.files[0]; e.target.value=""; if(f) importFile(f); };
 STATES.forEach(s=>$("fState").insertAdjacentHTML("beforeend",`<option>${s}</option>`));
 COMPONENTS.forEach(s=>$("fComp").insertAdjacentHTML("beforeend",`<option>${s}</option>`));
 $("fState").onchange=e=>{S.state=e.target.value;render();};
@@ -307,10 +315,10 @@ $("pipeLegend").addEventListener("click",e=>{const b=e.target.closest("button");
 $("list").addEventListener("click",e=>{const b=e.target.closest(".item"); if(b) select(b.dataset.id,true);});
 $("viewPen").onclick=()=>M.fit&&M.fit(PEN);
 $("viewAll").onclick=()=>M.fit&&M.fit(ALL);
-$("addBtn").onclick=()=>{ S.sel=null; S.editing={ _id:null, type:"Solar Rooftop", status:"Site Visit", component:"Komuniti Lestari", invoice:"Not Received", payment:"Not Paid" }; renderSide(); if(window.innerWidth<960) $("side").scrollIntoView({behavior:"smooth"}); };
+$("addBtn").onclick=()=>{ S.sel=null; S.editing={ _id:null, year:+(S.year||new Date().getFullYear()), type:"Solar Rooftop", status:"Site Visit", component:"Komuniti Lestari", invoice:"Not Received", payment:"Not Paid" }; renderSide(); if(window.innerWidth<960) $("side").scrollIntoView({behavior:"smooth"}); };
 $("exportBtn").onclick=()=>{
   if(!window.XLSX){ toast("Export isn’t available right now"); return; }
-  const rows=[...S.projects.values()].sort((a,b)=>(a.no||0)-(b.no||0)).map(p=>({"No.":p.no,"Component":p.component,"Project Name":p.name,"Type":p.type,"State":p.state,"Month":p.month,"Application Received Date":p.appDate,"Project Value (RM)":p.value,"Capacity (kWp)":p.kwp,"Streetlight Units":p.units,"Project Status":p.status,"Project Completion Date":p.completionDate,"Invoice Status":p.invoice,"Payment Status":p.payment,"NPOS Payment No.":p.nposNo,"NPOS Payment Date":p.nposDate,"Remarks":p.remarks,"Latitude":p.lat,"Longitude":p.lng,"Exact Location":p.locVerified?"Yes":"No","Google Maps":p.lat!=null?gmaps(p):""}));
+  const rows=[...S.projects.values()].sort((a,b)=>(a.no||0)-(b.no||0)).map(p=>({"Year":projYear(p),"No.":p.no,"Component":p.component,"Project Name":p.name,"Type":p.type,"State":p.state,"Month":p.month,"Application Received Date":p.appDate,"Project Value (RM)":p.value,"Capacity (kWp)":p.kwp,"Streetlight Units":p.units,"Project Status":p.status,"Project Completion Date":p.completionDate,"Invoice Status":p.invoice,"Payment Status":p.payment,"NPOS Payment No.":p.nposNo,"NPOS Payment Date":p.nposDate,"Remarks":p.remarks,"Latitude":p.lat,"Longitude":p.lng,"Exact Location":p.locVerified?"Yes":"No","Google Maps":p.lat!=null?gmaps(p):""}));
   const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),"Masterlist");
   XLSX.writeFile(wb,`CSR Solar Projects ${new Date().toISOString().slice(0,10)}.xlsx`);
 };
@@ -318,7 +326,7 @@ $("exportBtn").onclick=()=>{
 /* ================= FIREBASE ================= */
 const configured = CONFIG.firebase && CONFIG.firebase.projectId;
 let db=null, auth=null;
-if(CONFIG.title){ $("appTitle").textContent=CONFIG.title; document.title=CONFIG.title; }
+function renderTitle(){ const base=(CONFIG.title||"CSR Solar Projects").replace(/\s*20\d\d$/,""); const t=`${base} ${S.year||"2025–2030"}`; $("appTitle").textContent=t; document.title=t; }
 render();
 initMap().then(render);
 
@@ -357,11 +365,47 @@ async function startFirebase(){
     });
   });
 }
-async function importSeed(file){
-  try{
+const COLS={no:["no."],component:["component"],name:["project name"],state:["state"],month:["month"],appDate:["application received date"],value:["project value (rm)"],status:["project status"],completionDate:["project completion date"],invoice:["invoice status"],payment:["payment status"],nposNo:["npos payment no."],nposDate:["npos payment date"],remarks:["remarks"],year:["year","tahun"],type:["type"],kwp:["capacity (kwp)","kwp"],units:["streetlight units"],lat:["latitude"],lng:["longitude"]};
+const norm=h=>String(h??"").toLowerCase().replace(/\s+/g," ").trim();
+const isoDate=v=>{ if(v==null||v==="") return null; if(typeof v==="number"&&v>20000&&v<80000){ const d=new Date(Date.UTC(1899,11,30)+Math.round(v)*864e5); return d.toISOString().slice(0,10); } if(v instanceof Date&&!isNaN(v)) return `${v.getFullYear()}-${String(v.getMonth()+1).padStart(2,"0")}-${String(v.getDate()).padStart(2,"0")}`; const s=String(v).trim(); let m=s.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return m[0]; m=s.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/); if(m) return `${m[3]}-${m[2].padStart(2,"0")}-${m[1].padStart(2,"0")}`; m=s.match(/^(\d{2})(\d{2})(\d{4})$/); if(m) return `${m[3]}-${m[2]}-${m[1]}`; return null; };
+const numv=v=>{ if(v==null||v==="") return null; const n=Number(String(v).replace(/[^0-9.\-]/g,"")); return String(v).trim()===""||isNaN(n)?null:n; };
+function guessType(n){ n=n.toLowerCase(); const r=n.includes("rooftop")||n.includes("solar di "); const st=n.includes("streetlight")||n.includes("lampu jalan"); return r&&st?"Rooftop + Streetlight":r?"Solar Rooftop":st?"Solar Streetlight":"Other"; }
+async function readRows(file){
+  if(/\.json$/i.test(file.name)){
     const rows=JSON.parse(await file.text());
-    if(!Array.isArray(rows)||!rows.every(r=>r&&r.id&&r.data&&r.data.name)) throw new Error("This isn’t a projects file.");
-    const b=writeBatch(db); rows.forEach(r=>b.set(doc(db,"projects",r.id),{...r.data,updatedBy:S.user?.email||""})); await b.commit();
-    toast(`Imported ${rows.length} projects`);
+    if(!Array.isArray(rows)||!rows.every(r=>r&&r.data&&r.data.name)) throw new Error("This isn’t a projects file.");
+    return rows.map(r=>r.data);
+  }
+  if(!window.XLSX) throw new Error("Excel import isn’t available right now. Reload the page and try again.");
+  const wb=XLSX.read(await file.arrayBuffer());
+  const name=wb.SheetNames.find(n=>norm(n)==="masterlist")||wb.SheetNames[0];
+  const grid=XLSX.utils.sheet_to_json(wb.Sheets[name],{header:1,raw:true,defval:null});
+  const hi=grid.findIndex(r=>r.some(c=>norm(c)==="project name"));
+  if(hi<0) throw new Error(`Couldn’t find a “Project Name” column in sheet “${name}”. Use the same columns as the Masterlist sheet.`);
+  const head=grid[hi].map(norm), col={};
+  for(const [k,names] of Object.entries(COLS)){ const i=head.findIndex(h=>names.includes(h)); if(i>=0) col[k]=i; }
+  const fallbackYear=+(S.year||new Date().getFullYear());
+  return grid.slice(hi+1).filter(r=>r[col.name]&&String(r[col.name]).trim()).map(r=>{
+    const g=k=>col[k]==null?null:r[col[k]];
+    const nm=String(g("name")).replace(/\s+/g," ").trim(), app=isoDate(g("appDate"));
+    const um=nm.match(/(\d+)\s*unit/i), units=numv(g("units")) ?? (um?+um[1]:null);
+    const lat=numv(g("lat")), lng=numv(g("lng")), both=lat!=null&&lng!=null;
+    const yr=numv(g("year")) || (app?+app.slice(0,4):fallbackYear);
+    return { no:numv(g("no")), year:yr, component:g("component")||null, name:nm, type:TYPES.includes(g("type"))?g("type"):guessType(nm), state:g("state")||null, month:g("month")||null, appDate:app, value:numv(g("value")), status:STATUSES.includes(g("status"))?g("status"):"Site Visit", completionDate:isoDate(g("completionDate")), invoice:g("invoice")==="Received"?"Received":"Not Received", payment:g("payment")==="Paid"?"Paid":"Not Paid", nposNo:g("nposNo")!=null?String(g("nposNo")):"", nposDate:isoDate(g("nposDate")), remarks:g("remarks")!=null?String(g("remarks")):"", kwp:numv(g("kwp")), units, lat:both?lat:null, lng:both?lng:null, locVerified:false };
+  });
+}
+async function importFile(file){
+  if(!db){ toast("Finish setup before importing."); return; }
+  try{
+    const rows=await readRows(file);
+    const key=p=>`${projYear(p)}|${String(p.name).toLowerCase().replace(/\s+/g," ").trim()}`;
+    const have=new Set([...S.projects.values()].map(key));
+    const seen=new Set(), fresh=rows.filter(r=>{ const k=key(r); if(have.has(k)||seen.has(k)) return false; seen.add(k); return true; });
+    const skipped=rows.length-fresh.length;
+    if(!fresh.length){ toast(rows.length?`Nothing new: all ${rows.length} projects are already in the dashboard.`:"No projects found in that file."); return; }
+    const now=new Date().toISOString(), by=S.user?.email||"";
+    for(let i=0;i<fresh.length;i+=400){ const b=writeBatch(db); fresh.slice(i,i+400).forEach(r=>b.set(doc(collection(db,"projects")),{...r,updatedAt:now,updatedBy:by})); await b.commit(); }
+    const yrs=[...new Set(fresh.map(projYear))].sort().join(", ");
+    toast(`Imported ${fresh.length} project${fresh.length>1?"s":""} for ${yrs}${skipped?`. Skipped ${skipped} already in the dashboard.`:"."}`);
   }catch(e){ toast(e.code?permMsg(e):(e.message||"Import failed")); }
 }
