@@ -1,6 +1,6 @@
 import { CONFIG } from "./config.js";
 const FB="https://www.gstatic.com/firebasejs/10.12.2/";
-let initializeApp, getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, getFirestore, collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, getDoc;
+let initializeApp, getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, getFirestore, collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, getDoc, getDocs, updateDoc;
 
 const STATUSES = ["Site Visit","Pending Proposal","Pending Approval Memo","Approved","Ongoing","Completed"];
 const SVAR = {"Site Visit":"--s-visit","Pending Proposal":"--s-proposal","Pending Approval Memo":"--s-memo","Approved":"--s-approved","Ongoing":"--s-ongoing","Completed":"--s-done"};
@@ -13,6 +13,7 @@ const MONTHS = ["January","February","March","April","May","June","July","August
 const PEN=[[1.2,99.6],[6.8,104.6]], ALL=[[0.8,99.6],[7.4,119.3]];
 
 const S = { projects:new Map(), year:String(Math.min(2030,Math.max(2025,new Date().getFullYear()))), type:"solar", status:"", state:"", comp:"", q:"", sel:null, editing:null, confirmDel:false, pick:false, canWrite:false, user:null, loaded:false };
+const PH={ for:null, unsub:null, list:[], loading:false, open:null, busy:0 };
 try{ const t=localStorage.getItem("csr-type"); if(t) S.type=t; const y=localStorage.getItem("csr-year"); if(y!==null) S.year=y; }catch(e){}
 const projYear = p => p.year ? +p.year : (p.appDate ? +String(p.appDate).slice(0,4) : null);
 
@@ -195,6 +196,10 @@ function renderSide(){
       <dt>Payment</dt><dd>${flag(p.payment,"Paid")}${p.nposNo?` <span class="status-line">NPOS ${esc(p.nposNo)}${p.nposDate?", "+fmtDate(p.nposDate):""}</span>`:""}</dd>
       <dt>Remarks</dt><dd>${esc(p.remarks||"—")}</dd>
     </dl>
+    <div class="photos-box">
+      <div class="photos-head"><strong>Photos</strong>${S.canWrite?`<button class="btn small" type="button" id="addPhotosBtn">+ Add photos</button>`:""}</div>
+      <div id="photoGrid" class="photo-grid"></div>
+    </div>
     <div class="loc">
       <strong>Location</strong>
       ${p.lat!=null?`<span class="num">${p.lat}, ${p.lng}</span><span class="status-line">${p.locVerified?"Exact location confirmed":"Approximate pin placed from the project name. Edit the project to set the exact spot."}</span>`:`<span class="status-line">No pin yet${p.state==="Nationwide"?" (nationwide project)":""}.</span>`}
@@ -204,9 +209,11 @@ function renderSide(){
     ${S.confirmDel?`<div class="confirm"><span>Delete “${esc(p.name)}” for everyone?</span><button class="btn small danger" type="button" id="delYes">Delete</button><button class="btn small" type="button" id="delNo">Keep it</button></div>`:""}
     ${p.updatedAt?`<div class="status-line">Last updated ${new Date(p.updatedAt).toLocaleString("en-GB",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"})}${p.updatedBy?" by "+esc(p.updatedBy):""}</div>`:""}`;
   $("backBtn").onclick=closeDetail;
+  if($("addPhotosBtn")) $("addPhotosBtn").onclick=()=>$("photoInput").click();
+  renderPhotos();
   if($("editBtn")) $("editBtn").onclick=()=>{ S.editing={...p}; render(); };
   if($("delBtn")) $("delBtn").onclick=()=>{ S.confirmDel=true; render(); };
-  if($("delYes")) $("delYes").onclick=async()=>{ try{ await deleteDoc(doc(db,"projects",p._id)); S.sel=null; S.confirmDel=false; toast("Project deleted"); render(); }catch(e){ toast(permMsg(e)); } };
+  if($("delYes")) $("delYes").onclick=async()=>{ try{ const ph=await getDocs(collection(db,"projects",p._id,"photos")); for(const d of ph.docs) await deleteDoc(d.ref); await deleteDoc(doc(db,"projects",p._id)); S.sel=null; S.confirmDel=false; toast("Project deleted"); render(); }catch(e){ toast(permMsg(e)); } };
   if($("delNo")) $("delNo").onclick=()=>{ S.confirmDel=false; render(); };
 }
 const permMsg = e => e && e.code==="permission-denied" ? "Your account isn’t on the editor list. Ask the owner to add you." : "Couldn’t save: "+(e.message||e.code||e);
@@ -297,7 +304,7 @@ function render(){
   const all=filtered(true), rows=filtered(false);
   renderKpis(all); renderPipe(all); renderMap(rows); renderStateBars(all); renderPayBars(all);
   if(!S.editing || !$("editForm")){ renderList(rows); renderSide(); }
-  $("addBtn").hidden=!S.canWrite; $("importBtn").hidden=!S.canWrite; renderTitle();
+  $("addBtn").hidden=!S.canWrite; $("importBtn").hidden=!S.canWrite; renderTitle(); syncPhotos();
 }
 
 /* events */
@@ -339,7 +346,7 @@ if(!configured){
 }
 async function startFirebase(){
   const [a,b,c]=await Promise.all([import(FB+"firebase-app.js"),import(FB+"firebase-auth.js"),import(FB+"firebase-firestore.js")]);
-  ({initializeApp}=a); ({getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged}=b); ({getFirestore, collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, getDoc}=c);
+  ({initializeApp}=a); ({getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged}=b); ({getFirestore, collection, doc, onSnapshot, setDoc, deleteDoc, writeBatch, getDoc, getDocs, updateDoc}=c);
   const app=initializeApp(CONFIG.firebase); db=getFirestore(app); auth=getAuth(app);
   $("signInBtn").onclick=()=>signInWithPopup(auth,new GoogleAuthProvider()).catch(e=>{ if(e.code!=="auth/popup-closed-by-user") toast("Sign-in didn’t finish: "+e.code); });
   $("signOutBtn").onclick=()=>signOut(auth);
@@ -409,3 +416,80 @@ async function importFile(file){
     toast(`Imported ${fresh.length} project${fresh.length>1?"s":""} for ${yrs}${skipped?`. Skipped ${skipped} already in the dashboard.`:"."}`);
   }catch(e){ toast(e.code?permMsg(e):(e.message||"Import failed")); }
 }
+
+/* ================= PHOTOS =================
+   Stored in Firestore (no billing needed): projects/{id}/photos/{photoId}
+   Each photo is shrunk in the browser to fit well under Firestore's 1 MB document limit. */
+function syncPhotos(){
+  const want = db && S.sel && !S.editing ? S.sel : null;
+  if(want===PH.for) return;
+  if(PH.unsub){ PH.unsub(); PH.unsub=null; }
+  PH.for=want; PH.list=[]; PH.loading=!!want;
+  if(!want) return;
+  PH.unsub=onSnapshot(collection(db,"projects",want,"photos"), snap=>{
+    PH.loading=false;
+    PH.list=snap.docs.map(d=>({...d.data(),_id:d.id})).sort((a,b)=>String(a.takenAt||a.uploadedAt).localeCompare(String(b.takenAt||b.uploadedAt)));
+    renderPhotos(); if(PH.open) renderLightbox();
+  }, err=>{ PH.loading=false; renderPhotos(err.code==="permission-denied"?"Photos need the updated access rules (see SETUP.md).":"Couldn’t load photos."); });
+}
+function renderPhotos(msg){
+  const g=$("photoGrid"); if(!g) return;
+  if(msg){ g.innerHTML=`<span class="status-line">${esc(msg)}</span>`; return; }
+  if(!db){ g.innerHTML=`<span class="status-line">Photos are available once setup is finished.</span>`; return; }
+  const busy = PH.busy?`<div class="ph-tile ph-busy">Uploading ${PH.busy}…</div>`:"";
+  if(PH.loading){ g.innerHTML=`<span class="status-line">Loading photos…</span>`; return; }
+  if(!PH.list.length && !PH.busy){ g.innerHTML=`<span class="status-line">No photos yet.${S.canWrite?" Add site visit, installation or completion photos.":""}</span>`; return; }
+  g.innerHTML=PH.list.map((ph,i)=>`<button type="button" class="ph-tile" data-i="${i}" title="${esc(ph.caption||"")}"><img src="${ph.thumb||ph.data}" alt="${esc(ph.caption||"Project photo")}" loading="lazy"></button>`).join("")+busy;
+  g.querySelectorAll(".ph-tile[data-i]").forEach(b=>b.onclick=()=>{ PH.open=PH.list[+b.dataset.i]._id; renderLightbox(); });
+}
+function loadImage(file){
+  return new Promise((res,rej)=>{ const url=URL.createObjectURL(file), img=new Image(); img.onload=()=>{ URL.revokeObjectURL(url); res(img); }; img.onerror=()=>{ URL.revokeObjectURL(url); rej(new Error("unreadable")); }; img.src=url; });
+}
+function shrink(img,maxSide,quality){
+  const r=Math.min(1,maxSide/Math.max(img.naturalWidth,img.naturalHeight));
+  const c=document.createElement("canvas"); c.width=Math.round(img.naturalWidth*r); c.height=Math.round(img.naturalHeight*r);
+  const x=c.getContext("2d"); x.fillStyle="#fff"; x.fillRect(0,0,c.width,c.height); x.drawImage(img,0,0,c.width,c.height);
+  return { url:c.toDataURL("image/jpeg",quality), w:c.width, h:c.height };
+}
+async function addPhotos(files){
+  const pid=S.sel; if(!pid||!files.length) return;
+  let ok=0, bad=[];
+  PH.busy=files.length; renderPhotos();
+  for(const f of files){
+    try{
+      if(!/^image\//.test(f.type) && !/\.(jpe?g|png|webp|heic|heif)$/i.test(f.name)) throw new Error("not an image");
+      const img=await loadImage(f);
+      let side=1600, q=.78, full=shrink(img,side,q);
+      while(full.url.length>850000 && side>600){ side=Math.round(side*.8); q=Math.max(.6,q-.05); full=shrink(img,side,q); }
+      const thumb=shrink(img,360,.7);
+      const taken=f.lastModified?new Date(f.lastModified).toISOString():new Date().toISOString();
+      await setDoc(doc(collection(db,"projects",pid,"photos")),{ data:full.url, thumb:thumb.url, w:full.w, h:full.h, caption:"", fileName:f.name, takenAt:taken, uploadedAt:new Date().toISOString(), uploadedBy:S.user?.email||"" });
+      ok++;
+    }catch(e){ bad.push(f.name); if(e.code==="permission-denied"){ toast(permMsg(e)); break; } }
+    PH.busy--; renderPhotos();
+  }
+  PH.busy=0; renderPhotos();
+  if(bad.length) toast(`${ok} added. Couldn’t read ${bad.length} file${bad.length>1?"s":""} (${bad.slice(0,2).join(", ")}${bad.length>2?"…":""}). iPhone HEIC photos may need to be saved as JPEG first.`);
+  else if(ok) toast(`${ok} photo${ok>1?"s":""} added`);
+}
+function renderLightbox(){
+  const lb=$("lightbox"), i=PH.list.findIndex(x=>x._id===PH.open);
+  if(i<0){ PH.open=null; lb.hidden=true; return; }
+  const ph=PH.list[i], when=ph.takenAt?new Date(ph.takenAt).toLocaleDateString("en-GB",{day:"numeric",month:"short",year:"numeric"}):"";
+  lb.hidden=false;
+  lb.innerHTML=`<div class="lb-inner" role="dialog" aria-label="Photo ${i+1} of ${PH.list.length}">
+    <div class="lb-top"><span class="status-line">${i+1} / ${PH.list.length}${when?" · "+when:""}${ph.uploadedBy?" · added by "+esc(ph.uploadedBy):""}</span><button class="btn small" type="button" id="lbClose">Close ✕</button></div>
+    <div class="lb-img"><button class="lb-nav" type="button" id="lbPrev" aria-label="Previous" ${i===0?"disabled":""}>‹</button><img src="${ph.data}" alt="${esc(ph.caption||"Project photo")}"><button class="lb-nav" type="button" id="lbNext" aria-label="Next" ${i===PH.list.length-1?"disabled":""}>›</button></div>
+    ${S.canWrite?`<div class="lb-edit"><input id="lbCaption" placeholder="Add a caption, e.g. Panels installed on main hall roof" value="${esc(ph.caption||"")}"><button class="btn small primary" type="button" id="lbSave">Save caption</button><button class="btn small danger" type="button" id="lbDel">Delete photo</button></div><div id="lbConfirm"></div>`:(ph.caption?`<div class="lb-cap">${esc(ph.caption)}</div>`:"")}
+  </div>`;
+  const go=d=>{ const n=PH.list[i+d]; if(n){ PH.open=n._id; renderLightbox(); } };
+  $("lbClose").onclick=closeLightbox; $("lbPrev").onclick=()=>go(-1); $("lbNext").onclick=()=>go(1);
+  if($("lbSave")) $("lbSave").onclick=async()=>{ try{ await updateDoc(doc(db,"projects",PH.for,"photos",ph._id),{caption:$("lbCaption").value.trim()}); toast("Caption saved"); }catch(e){ toast(permMsg(e)); } };
+  if($("lbDel")) $("lbDel").onclick=()=>{ $("lbConfirm").innerHTML=`<div class="confirm"><span>Delete this photo for everyone?</span><button class="btn small danger" type="button" id="lbDelYes">Delete</button><button class="btn small" type="button" id="lbDelNo">Keep it</button></div>`;
+    $("lbDelNo").onclick=()=>$("lbConfirm").innerHTML="";
+    $("lbDelYes").onclick=async()=>{ try{ const next=PH.list[i+1]||PH.list[i-1]; await deleteDoc(doc(db,"projects",PH.for,"photos",ph._id)); PH.open=next?next._id:null; toast("Photo deleted"); if(!PH.open) closeLightbox(); }catch(e){ toast(permMsg(e)); } }; };
+}
+function closeLightbox(){ PH.open=null; $("lightbox").hidden=true; $("lightbox").innerHTML=""; }
+$("photoInput").onchange=e=>{ const fs=[...e.target.files]; e.target.value=""; addPhotos(fs); };
+$("lightbox").addEventListener("click",e=>{ if(e.target.id==="lightbox") closeLightbox(); });
+document.addEventListener("keydown",e=>{ if(!PH.open||e.target.tagName==="INPUT") return; if(e.key==="Escape") closeLightbox(); if(e.key==="ArrowLeft") $("lbPrev")?.click(); if(e.key==="ArrowRight") $("lbNext")?.click(); });

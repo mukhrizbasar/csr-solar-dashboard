@@ -53,3 +53,9 @@ Open the site, click **Sign in with Google** with an editor email. The list will
 - The year comes from a "Year" column if the file has one, otherwise from the Application Received Date, otherwise the year currently selected.
 - Projects already in the dashboard (same name and year) are skipped, so importing the same file twice is safe.
 - Imported projects have no map pin yet. Open each one, click **Edit project**, then **Pick on map**.
+
+## Project photos
+- Open a project and click **+ Add photos**. You can pick several at once, and on a phone you can take them with the camera. Click a photo to view it full size, add a caption, or delete it.
+- Photos are shrunk in the browser (longest side about 1600 px) and stored in Firestore, so no paid Firebase Storage plan is needed. The free plan holds about 1 GB, which is roughly 4,000 to 6,000 photos.
+- **One-time step:** photos need the updated rules. In Firebase, go to **Firestore > Rules**, replace everything with the contents of `firestore.rules`, and click **Publish**.
+- iPhone photos in HEIC format may not open in Chrome or Windows. Set **iPhone Settings > Camera > Formats > Most Compatible**, or send them as JPEG.

@@ -18,5 +18,9 @@ service cloud.firestore {
       allow read: if isViewer();
       allow write: if isEditor();
     }
+    match /projects/{id}/photos/{photoId} {
+      allow read: if isViewer();
+      allow write: if isEditor() && (request.resource == null || request.resource.data.data.size() < 1000000);
+    }
   }
 }
