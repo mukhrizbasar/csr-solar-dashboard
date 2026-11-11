@@ -173,6 +173,23 @@ form.edit textarea{min-height:64px;resize:vertical}
 .toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:9px 16px;border-radius:999px;font-weight:600;z-index:2000;box-shadow:0 4px 16px rgba(0,0,0,.25)}
 .status-line{font-size:.78rem;color:var(--muted)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+.photos-box{display:flex;flex-direction:column;gap:8px}
+.photos-head{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:6px}
+.ph-tile{aspect-ratio:1;max-width:100%;border:1px solid var(--line);border-radius:6px;padding:0;overflow:hidden;background:var(--surface-2);cursor:zoom-in}
+.ph-tile img{width:100%;height:100%;object-fit:cover;display:block}
+.ph-busy{display:flex;align-items:center;justify-content:center;font-size:.72rem;color:var(--muted);cursor:default;text-align:center;padding:4px}
+.lightbox{position:fixed;inset:0;z-index:3000;background:rgba(8,12,10,.86);display:flex;align-items:center;justify-content:center;padding:calc(12px + env(safe-area-inset-top,0px)) max(12px,env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px))}
+.lb-inner{background:var(--surface);border-radius:12px;max-width:min(1100px,100%);max-height:100%;width:100%;display:flex;flex-direction:column;gap:10px;padding:12px;overflow:auto}
+.lb-top{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.lb-img{position:relative;display:flex;align-items:center;justify-content:center;background:var(--surface-2);border-radius:8px;min-height:200px}
+.lb-img img{max-width:100%;max-height:70vh;object-fit:contain;display:block}
+.lb-nav{position:absolute;top:50%;transform:translateY(-50%);width:40px;height:56px;border:0;border-radius:8px;background:rgba(0,0,0,.45);color:#fff;font-size:28px;line-height:1}
+.lb-nav:disabled{opacity:.2;cursor:default}
+#lbPrev{left:8px} #lbNext{right:8px}
+.lb-edit{display:flex;gap:8px;flex-wrap:wrap}
+.lb-edit input{flex:1 1 240px;min-width:0;border:1px solid var(--line);background:var(--bg);color:var(--fg);border-radius:7px;padding:7px 9px}
+.lb-cap{font-weight:600}
 </style>
 <style>body{margin:0} [hidden]{display:none!important}</style>
 </head>
@@ -250,8 +267,9 @@ form.edit textarea{min-height:64px;resize:vertical}
   </section>
 </div>
 <div class="toast" id="toast" hidden></div>
+<div class="lightbox" id="lightbox" hidden></div>
+<input type="file" id="photoInput" accept="image/*" multiple hidden>
 
-<div class="toast" id="toast" hidden></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script type="module" src="app.js"></script>
